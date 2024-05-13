@@ -44,8 +44,7 @@ pub enum Command {
     SAdd(SAdd),
     SIsMember(SIsMember),
 
-    // unrecognized command
-    Unrecognized(Unrecognized),
+    CmdPrompt(CmdPrompt),
 }
 
 #[derive(Debug)]
@@ -102,7 +101,7 @@ pub struct SIsMember {
 }
 
 #[derive(Debug)]
-pub struct Unrecognized;
+pub struct CmdPrompt;
 
 impl TryFrom<RespFrame> for Command {
     type Error = CommandError;
@@ -130,7 +129,10 @@ impl TryFrom<RespArray> for Command {
                 b"echo" => Ok(Echo::try_from(v)?.into()),
                 b"sadd" => Ok(SAdd::try_from(v)?.into()),
                 b"sismember" => Ok(SIsMember::try_from(v)?.into()),
-                _ => Ok(Unrecognized.into()),
+                b"COMMAND" => Ok(CmdPrompt.into()),
+                v => Err(CommandError::InvalidCommand(
+                    String::from_utf8_lossy(v).to_string(),
+                )),
             },
             _ => Err(CommandError::InvalidCommand(
                 "Command must have a BulkString as the first argument".to_string(),
@@ -139,7 +141,7 @@ impl TryFrom<RespArray> for Command {
     }
 }
 
-impl CommandExecutor for Unrecognized {
+impl CommandExecutor for CmdPrompt {
     fn execute(self, _: &Backend) -> RespFrame {
         RESP_OK.clone()
     }
@@ -203,6 +205,19 @@ mod tests {
 
         let ret = cmd.execute(&backend);
         assert_eq!(ret, RespFrame::Null(RespNull));
+
+        Ok(())
+    }
+
+    #[test]
+    fn test_invalid_command() -> Result<()> {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*2\r\n$3\r\nmet\r\n$5\r\nhello\r\n");
+
+        let frame = RespArray::decode(&mut buf)?;
+        let cmd_result: Result<Command, CommandError> = frame.try_into();
+
+        assert!(cmd_result.is_err());
 
         Ok(())
     }
