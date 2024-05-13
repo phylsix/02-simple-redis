@@ -42,6 +42,7 @@ pub enum Command {
 
     Echo(Echo),
     SAdd(SAdd),
+    SIsMember(SIsMember),
 
     // unrecognized command
     Unrecognized(Unrecognized),
@@ -95,6 +96,12 @@ pub struct SAdd {
 }
 
 #[derive(Debug)]
+pub struct SIsMember {
+    key: String,
+    member: String,
+}
+
+#[derive(Debug)]
 pub struct Unrecognized;
 
 impl TryFrom<RespFrame> for Command {
@@ -122,6 +129,7 @@ impl TryFrom<RespArray> for Command {
                 b"hmget" => Ok(HMGet::try_from(v)?.into()),
                 b"echo" => Ok(Echo::try_from(v)?.into()),
                 b"sadd" => Ok(SAdd::try_from(v)?.into()),
+                b"sismember" => Ok(SIsMember::try_from(v)?.into()),
                 _ => Ok(Unrecognized.into()),
             },
             _ => Err(CommandError::InvalidCommand(

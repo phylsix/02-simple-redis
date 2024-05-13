@@ -68,7 +68,7 @@ impl Backend {
         self.hmap.get(key).map(|v| v.clone())
     }
 
-    pub fn sadd(&self, key: &str, members: Vec<String>) -> i64 {
+    pub fn sadd(&self, key: &str, members: Vec<String>) -> RespFrame {
         let set = self.hmap.entry(key.to_string()).or_default();
         let mut added = 0;
         for member in members {
@@ -76,6 +76,16 @@ impl Backend {
                 added += 1;
             }
         }
-        added
+        added.into()
+    }
+
+    pub fn sismember(&self, key: &str, member: &str) -> RespFrame {
+        let res = self
+            .hmap
+            .get(key)
+            .map(|v| v.contains_key(member))
+            .unwrap_or(false);
+
+        (res as i64).into()
     }
 }

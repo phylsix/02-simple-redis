@@ -1,5 +1,6 @@
 use super::{
-    extract_args, validate_command, CommandExecutor, HGet, HGetAll, HMGet, HSet, SAdd, RESP_OK,
+    extract_args, validate_command, CommandExecutor, HGet, HGetAll, HMGet, HSet, SAdd, SIsMember,
+    RESP_OK,
 };
 use crate::{cmd::CommandError, BulkString, RespArray, RespFrame};
 
@@ -69,7 +70,13 @@ impl CommandExecutor for HSet {
 
 impl CommandExecutor for SAdd {
     fn execute(self, backend: &crate::Backend) -> RespFrame {
-        backend.sadd(self.key.as_str(), self.members).into()
+        backend.sadd(self.key.as_str(), self.members)
+    }
+}
+
+impl CommandExecutor for SIsMember {
+    fn execute(self, backend: &crate::Backend) -> RespFrame {
+        backend.sismember(&self.key, &self.member)
     }
 }
 
@@ -190,6 +197,26 @@ impl TryFrom<RespArray> for HSet {
     }
 }
 
+impl TryFrom<RespArray> for SIsMember {
+    type Error = CommandError;
+    fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        validate_command(&value, &["sismember"], 2)?;
+
+        let mut args = extract_args(value, 1)?.into_iter();
+        match (args.next(), args.next()) {
+            (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(member))) => {
+                Ok(SIsMember {
+                    key: String::from_utf8(key.0)?,
+                    member: String::from_utf8(member.0)?,
+                })
+            }
+            _ => Err(CommandError::InvalidArgument(
+                "Invalid key or member".to_string(),
+            )),
+        }
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use crate::RespDecode;
@@ -250,6 +277,18 @@ mod tests {
         let result: SAdd = frame.try_into().unwrap();
         assert_eq!(result.key, "set");
         assert_eq!(result.members, vec!["hello"]);
+    }
+
+    #[test]
+    fn test_sismember_from_resp_array() {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*3\r\n$9\r\nsismember\r\n$3\r\nset\r\n$5\r\nhello\r\n");
+
+        let frame = RespArray::decode(&mut buf).unwrap();
+
+        let result: SIsMember = frame.try_into().unwrap();
+        assert_eq!(result.key, "set");
+        assert_eq!(result.member, "hello");
     }
 
     #[test]
@@ -359,6 +398,30 @@ mod tests {
         let cmd = SAdd {
             key: "set".to_string(),
             members: vec!["hello".to_string(), "world".to_string()],
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, 0.into());
+    }
+
+    #[test]
+    fn test_sismember_commands() {
+        let backend = crate::Backend::new();
+        let cmd = SAdd {
+            key: "set".to_string(),
+            members: vec!["hello".to_string()],
+        };
+        cmd.execute(&backend);
+
+        let cmd = SIsMember {
+            key: "set".to_string(),
+            member: "hello".to_string(),
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, 1.into());
+
+        let cmd = SIsMember {
+            key: "set".to_string(),
+            member: "world".to_string(),
         };
         let result = cmd.execute(&backend);
         assert_eq!(result, 0.into());
