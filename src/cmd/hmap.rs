@@ -1,4 +1,6 @@
-use super::{extract_args, validate_command, CommandExecutor, HGet, HGetAll, HMGet, HSet, RESP_OK};
+use super::{
+    extract_args, validate_command, CommandExecutor, HGet, HGetAll, HMGet, HSet, SAdd, RESP_OK,
+};
 use crate::{cmd::CommandError, BulkString, RespArray, RespFrame};
 
 impl CommandExecutor for HGet {
@@ -65,6 +67,12 @@ impl CommandExecutor for HSet {
     }
 }
 
+impl CommandExecutor for SAdd {
+    fn execute(self, backend: &crate::Backend) -> RespFrame {
+        backend.sadd(self.key.as_str(), self.members).into()
+    }
+}
+
 impl TryFrom<RespArray> for HGet {
     type Error = CommandError;
     fn try_from(value: RespArray) -> Result<Self, Self::Error> {
@@ -123,6 +131,37 @@ impl TryFrom<RespArray> for HMGet {
             Ok(HMGet {
                 key: String::from_utf8(key.0)?,
                 fields,
+            })
+        } else {
+            Err(CommandError::InvalidArgument("Invalid key".to_string()))
+        }
+    }
+}
+
+impl TryFrom<RespArray> for SAdd {
+    type Error = CommandError;
+    fn try_from(value: RespArray) -> Result<Self, Self::Error> {
+        if value.len() < 3 {
+            return Err(CommandError::InvalidArgument(
+                "command sadd must have at least 2 arguments".to_string(),
+            ));
+        }
+        validate_command(&RespArray::new(&value[0..1]), &["sadd"], 0)?;
+
+        let mut args = extract_args(value, 1)?.into_iter();
+        if let Some(RespFrame::BulkString(key)) = args.next() {
+            let members = args
+                .map(|f| {
+                    if let RespFrame::BulkString(field) = f {
+                        Ok(String::from_utf8(field.0)?)
+                    } else {
+                        Err(CommandError::InvalidArgument("Invalid member".to_string()))
+                    }
+                })
+                .collect::<Result<Vec<String>, CommandError>>()?;
+            Ok(SAdd {
+                key: String::from_utf8(key.0)?,
+                members,
             })
         } else {
             Err(CommandError::InvalidArgument("Invalid key".to_string()))
@@ -199,6 +238,18 @@ mod tests {
         assert_eq!(result.value, RespFrame::BulkString(b"world".into()));
 
         Ok(())
+    }
+
+    #[test]
+    fn test_sadd_from_resp_array() {
+        let mut buf = BytesMut::new();
+        buf.extend_from_slice(b"*3\r\n$4\r\nsadd\r\n$3\r\nset\r\n$5\r\nhello\r\n");
+
+        let frame = RespArray::decode(&mut buf).unwrap();
+
+        let result: SAdd = frame.try_into().unwrap();
+        assert_eq!(result.key, "set");
+        assert_eq!(result.members, vec!["hello"]);
     }
 
     #[test]
@@ -286,5 +337,30 @@ mod tests {
         ]);
         assert_eq!(result, expected.into());
         Ok(())
+    }
+
+    #[test]
+    fn test_sadd_commands() {
+        let backend = crate::Backend::new();
+        let cmd = SAdd {
+            key: "set".to_string(),
+            members: vec!["hello".to_string()],
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, 1.into());
+
+        let cmd = SAdd {
+            key: "set".to_string(),
+            members: vec!["world".to_string()],
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, 1.into());
+
+        let cmd = SAdd {
+            key: "set".to_string(),
+            members: vec!["hello".to_string(), "world".to_string()],
+        };
+        let result = cmd.execute(&backend);
+        assert_eq!(result, 0.into());
     }
 }

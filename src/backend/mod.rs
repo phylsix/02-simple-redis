@@ -1,7 +1,12 @@
-use crate::RespFrame;
+use crate::{RespFrame, RespNull};
 use dashmap::DashMap;
+use lazy_static::lazy_static;
 use std::ops::Deref;
 use std::sync::Arc;
+
+lazy_static! {
+    static ref RESP_NIL: RespFrame = RespFrame::Null(RespNull);
+}
 
 #[derive(Debug, Clone)]
 pub struct Backend(Arc<BackendInner>);
@@ -61,5 +66,16 @@ impl Backend {
 
     pub fn hgetall(&self, key: &str) -> Option<DashMap<String, RespFrame>> {
         self.hmap.get(key).map(|v| v.clone())
+    }
+
+    pub fn sadd(&self, key: &str, members: Vec<String>) -> i64 {
+        let set = self.hmap.entry(key.to_string()).or_default();
+        let mut added = 0;
+        for member in members {
+            if set.insert(member, RESP_NIL.clone()).is_none() {
+                added += 1;
+            }
+        }
+        added
     }
 }
