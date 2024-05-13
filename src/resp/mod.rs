@@ -20,7 +20,7 @@ const CRLF_LEN: usize = CRLF.len();
 
 pub use self::{
     array::{RespArray, RespNullArray},
-    bulk_string::{BulkString, RespNullBulkString},
+    bulk_string::BulkString,
     frame::RespFrame,
     map::RespMap,
     null::RespNull,

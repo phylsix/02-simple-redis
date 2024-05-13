@@ -88,8 +88,8 @@ impl TryFrom<RespArray> for HGet {
         let mut args = extract_args(value, 1)?.into_iter();
         match (args.next(), args.next()) {
             (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field))) => Ok(HGet {
-                key: String::from_utf8(key.0)?,
-                field: String::from_utf8(field.0)?,
+                key: String::from_utf8(key.as_ref().to_vec())?,
+                field: String::from_utf8(field.as_ref().to_vec())?,
             }),
             _ => Err(CommandError::InvalidArgument(
                 "Invalid key or field".to_string(),
@@ -106,7 +106,7 @@ impl TryFrom<RespArray> for HGetAll {
         let mut args = extract_args(value, 1)?.into_iter();
         match args.next() {
             Some(RespFrame::BulkString(key)) => Ok(HGetAll {
-                key: String::from_utf8(key.0)?,
+                key: String::from_utf8(key.as_ref().to_vec())?,
                 sort: false,
             }),
             _ => Err(CommandError::InvalidArgument("Invalid key".to_string())),
@@ -129,14 +129,14 @@ impl TryFrom<RespArray> for HMGet {
             let fields = args
                 .map(|f| {
                     if let RespFrame::BulkString(field) = f {
-                        Ok(String::from_utf8(field.0)?)
+                        Ok(String::from_utf8(field.as_ref().to_vec())?)
                     } else {
                         Err(CommandError::InvalidArgument("Invalid field".to_string()))
                     }
                 })
                 .collect::<Result<Vec<String>, CommandError>>()?;
             Ok(HMGet {
-                key: String::from_utf8(key.0)?,
+                key: String::from_utf8(key.as_ref().to_vec())?,
                 fields,
             })
         } else {
@@ -160,14 +160,14 @@ impl TryFrom<RespArray> for SAdd {
             let members = args
                 .map(|f| {
                     if let RespFrame::BulkString(field) = f {
-                        Ok(String::from_utf8(field.0)?)
+                        Ok(String::from_utf8(field.as_ref().to_vec())?)
                     } else {
                         Err(CommandError::InvalidArgument("Invalid member".to_string()))
                     }
                 })
                 .collect::<Result<Vec<String>, CommandError>>()?;
             Ok(SAdd {
-                key: String::from_utf8(key.0)?,
+                key: String::from_utf8(key.as_ref().to_vec())?,
                 members,
             })
         } else {
@@ -185,8 +185,8 @@ impl TryFrom<RespArray> for HSet {
         match (args.next(), args.next(), args.next()) {
             (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(field)), Some(value)) => {
                 Ok(HSet {
-                    key: String::from_utf8(key.0)?,
-                    field: String::from_utf8(field.0)?,
+                    key: String::from_utf8(key.as_ref().to_vec())?,
+                    field: String::from_utf8(field.as_ref().to_vec())?,
                     value,
                 })
             }
@@ -206,8 +206,8 @@ impl TryFrom<RespArray> for SIsMember {
         match (args.next(), args.next()) {
             (Some(RespFrame::BulkString(key)), Some(RespFrame::BulkString(member))) => {
                 Ok(SIsMember {
-                    key: String::from_utf8(key.0)?,
-                    member: String::from_utf8(member.0)?,
+                    key: String::from_utf8(key.as_ref().to_vec())?,
+                    member: String::from_utf8(member.as_ref().to_vec())?,
                 })
             }
             _ => Err(CommandError::InvalidArgument(
