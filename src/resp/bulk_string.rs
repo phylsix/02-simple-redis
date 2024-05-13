@@ -1,5 +1,3 @@
-use std::ops::Deref;
-
 use bytes::{Buf, BytesMut};
 
 use crate::{RespDecode, RespEncode, RespError};
@@ -64,14 +62,6 @@ impl BulkString {
 impl AsRef<[u8]> for BulkString {
     fn as_ref(&self) -> &[u8] {
         self.0.as_deref().unwrap_or_default()
-    }
-}
-
-impl Deref for BulkString {
-    type Target = Option<Vec<u8>>;
-
-    fn deref(&self) -> &Self::Target {
-        &self.0
     }
 }
 

@@ -117,14 +117,20 @@ impl TryFrom<RespArray> for HGetAll {
 impl TryFrom<RespArray> for HMGet {
     type Error = CommandError;
     fn try_from(value: RespArray) -> Result<Self, Self::Error> {
-        if value.len() < 3 {
+        let args = extract_args(value, 0)?;
+        if args.len() < 3 {
             return Err(CommandError::InvalidArgument(
                 "command hmget must have at least 2 arguments".to_string(),
             ));
         }
-        validate_command(&RespArray::new(&value[0..1]), &["hmget"], 0)?;
+        if args[0] != BulkString::new(b"hmget".to_vec()).into() {
+            return Err(CommandError::InvalidArgument(format!(
+                "Invalid command: {:?}, expect hmget",
+                args[0]
+            )));
+        }
 
-        let mut args = extract_args(value, 1)?.into_iter();
+        let mut args = args.into_iter().skip(1);
         if let Some(RespFrame::BulkString(key)) = args.next() {
             let fields = args
                 .map(|f| {
@@ -148,14 +154,20 @@ impl TryFrom<RespArray> for HMGet {
 impl TryFrom<RespArray> for SAdd {
     type Error = CommandError;
     fn try_from(value: RespArray) -> Result<Self, Self::Error> {
-        if value.len() < 3 {
+        let args = extract_args(value, 0)?;
+        if args.len() < 3 {
             return Err(CommandError::InvalidArgument(
                 "command sadd must have at least 2 arguments".to_string(),
             ));
         }
-        validate_command(&RespArray::new(&value[0..1]), &["sadd"], 0)?;
+        if args[0] != BulkString::new(b"sadd".to_vec()).into() {
+            return Err(CommandError::InvalidArgument(format!(
+                "Invalid command: {:?}, expect sadd",
+                args[0]
+            )));
+        }
 
-        let mut args = extract_args(value, 1)?.into_iter();
+        let mut args = args.into_iter().skip(1);
         if let Some(RespFrame::BulkString(key)) = args.next() {
             let members = args
                 .map(|f| {

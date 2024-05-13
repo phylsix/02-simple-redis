@@ -118,7 +118,7 @@ impl TryFrom<RespFrame> for Command {
 impl TryFrom<RespArray> for Command {
     type Error = CommandError;
     fn try_from(v: RespArray) -> Result<Self, Self::Error> {
-        match v.first() {
+        match v.as_ref().first() {
             Some(RespFrame::BulkString(ref cmd)) => match cmd.as_ref() {
                 b"get" => Ok(Get::try_from(v)?.into()),
                 b"set" => Ok(Set::try_from(v)?.into()),
@@ -152,6 +152,8 @@ fn validate_command(
     names: &[&'static str],
     n_args: usize,
 ) -> Result<(), CommandError> {
+    let value = value.as_ref();
+
     if value.len() != n_args + names.len() {
         return Err(CommandError::InvalidArgument(format!(
             "{} command must have exactly {} argument",
@@ -182,7 +184,7 @@ fn validate_command(
 }
 
 fn extract_args(value: RespArray, start: usize) -> Result<Vec<RespFrame>, CommandError> {
-    Ok(value.0.into_iter().skip(start).collect::<Vec<RespFrame>>())
+    Ok(value.as_ref()[start..].to_vec())
 }
 
 #[cfg(test)]
